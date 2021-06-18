@@ -1,0 +1,101 @@
+Task 1:
+The data being inserted into the stock_market_filtered_date table needed to be modified so it fits the table schema. This means that the data need to be processed as it was inserted into the table. The processing is happening on a cluster, so a mapper is needed to split the work and verify the integrity of the data. When the data was inserted to the original stock_market table, a mapper wasn't necessary because no data needed to be processed. 
+Task 2:
+	1. Command: select sum(volume) from stock_market_filtered_date where month = 10;
+		Result: 1881378705934
+		Cumulative CPU: 12.43 seconds
+		HDFS Read: 371917802
+		HDFS Write: 14
+		Time Taken (total): 25.074 seconds 
+	2. Command: select sum(volume) from stock_market_filtered_date where month = 3 and day = 31;
+		Result: 59404428453
+		Cumulative CPU: 12.77 seconds
+		HDFS Read: 371918355
+		HDFS Write: 12
+		Time Taken (total): 23.92 seconds
+	3. Command: select sum(volume) from stock_market_filtered_date where year = 2000 and  month = 1 and day >= 1 and day <16;
+		Result: 19421657706
+		Cumulative CPU: 13.13 seconds
+		HDFS Read: 371919237
+		HDFS Write: 12
+		Time Taken (total): 27.203 seconds
+Task 3:
+	1. Command: select sum(volume) from stock_market_filtered_date_partitioned_month where month = 10;
+		Result: 1881378705934
+		Cumulative CPU: 5.11 seconds
+		HDFS Read: 31511850
+		HDFS Write: 14
+		Time Taken (total): 24.004 seconds
+	2. Command: select sum(volume) from stock_market_filtered_date_partitioned_month where month = 3 and day = 31;
+		Result: 59404428453
+		Cumulative CPU: 4.94 seconds
+		HDFS Read: 31306408
+		HDFS Write: 12
+		Time Taken (total): 22.584 seconds
+	3. Command: select sum(volume) from stock_market_filtered_date_partitioned_month where year = 2000 and month = 1 and day >= 1 and day <16;
+		Result: 19421657706
+		Cumulative CPU: 4.87 seconds
+		HDFS Read: 27600796
+		HDFS Write: 12
+		Time Taken (total): 23.699 seconds
+For each result, the Cumulative Cpu time was about 7 or 8 seconds shorter in the partitioned table, but the total time taken was about the same. This is because the amount of data being read is still the same, so we would expect it to take the same amount of time total to get the result. The table with paritions had a lower cumulative cpu because it is faster to load smaller tables.
+Task 4:
+	Table: stock_market_filtered_date_partitioned_year
+	create table stock_market_filtered_date_partitioned_year(company string, month int, day int, open float, high float, low float,close float, volume int, open_int int) partitioned by (year int);
+	insert into table stock_market_filtered_date_partitioned_year partition (year) select company, month, day, open, high, low, close,volume, open_int, year from stock_market_filtered_date;
+		1. Command: select sum(volume) from stock_market_filtered_date_partitioned_year where month = 10;
+			Result: 1881378705934
+			Cumulative CPU: 25.95 seconds
+			HDFS Read: 335248041
+			HDFS Write: 14
+			Time Taken (total): 27.667
+		2. Command: select sum(volume) from stock_market_filtered_date_partitioned_year where month = 3 and day = 31;
+			Result: 59404428453
+			Cumulative CPU: 27.31 seconds
+			HDFS Read: 335248929
+			HDFS Write: 12
+			Time Taken (total): 27.249
+		3. Command: select sum(volume) from stock_market_filtered_date_partitioned_year where year = 2000 and month = 1 and day >= 1 and day <16;
+			Result: 19421657706
+			Cumulative CPU: 5.12 seconds
+			HDFS Read: 4017092
+			HDFS Write: 12
+			Time Taken (total): 24.907 seconds
+
+	Table: stock_market_filtered_date_partitioned_day
+	create table stock_market_filtered_date_partitioned_day(company string, year int, month int, open float, high float, low float,close float, volume int, open_int int) partitioned by (day int);
+	insert into table stock_market_filtered_date_partitioned_day partition (day) select company, year, month, open, high, low, close,volume, open_int, day from stock_market_filtered_date;
+
+		1. Command: select sum(volume) from stock_market_filtered_date_partitioned_day where month = 10;
+			Result: 1881378705934
+			Cumulative CPU: 25.59 seconds
+			HDFS Read: 352051373
+			HDFS Write: 14
+			Time Taken (total): 23.133 seconds
+		2. Command: select sum(volume) from stock_market_filtered_date_partitioned_day where month = 3 and day = 31;
+			Result: 59404428453
+			Cumulative CPU: 4.23 seconds
+			HDFS Read: 6896607
+			HDFS Write: 12
+			Time Taken (total): 21.678
+		3. Command: select sum(volume) from stock_market_filtered_date_partitioned_day where year = 2000 and month = 1 and day >= 1 and day <16;
+			Result: 19421657706
+			Cumulative CPU: 20.63 seconds
+			HDFS Read: 174544629
+			HDFS Write: 12
+			Time Taken (total): 23.142 seconds 
+The partition that performed the best was the partition for day because it produced the smallest table, thus reducing the overhead of loading large tables into memory.
+
+Task 5:
+Using supplied command:
+	Count: 343 companies
+	Elapsed Time: 5 seconds
+Querying table stock_market:
+	Query: select count(*) from stock_market where date like '2000-01-03';
+	Count: 343 companies
+	Elapsed Time: 28.177 seconds
+Querying table stock_market_filtered_date:
+	Query: select count(*) from stock_market_filtered_date where year = 2000 and month = 1 and day = 3;
+	Count: 343 companies
+	Elapsed Time: 26.812 seconds
+The time it took to complete the query was substantially longer for the tables than for searching the string. This is even true when not accounting for the overhead necessary to translate the data into the table in the first place. The query on the table with MapReduce was a little faster than the query applied to the table without it. Part of the reason for this difference is the overhead of loading the table into memory. Another part of the reason is that the command operates on string comparisons which means that it is operating as one lengthy comparison. The queries, on the other hand, are performing multiple discrete comparions between values, which increases the run time.
